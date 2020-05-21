@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="initial-scale=1 width=device-width">
+        <title>Chat | Ratchet WebSocket</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/MaterialDesign-Webfont/5.2.45/css/materialdesignicons.css" rel="stylesheet">
+        <link href="public/css/chat.css" rel="stylesheet">
+    </head>
+    <body>
+        <main class="container">
+            <section class="login">
+                <div class="login__header">
+                    <strong>Acessar Chat</strong>
+                </div>
+                <div class="login__form">
+                    <input type="text" name="name" placeholder="Seu nome">
+                    <button class="btn btn__login">Acessar</button>
+                </div>
+            </section>
+            <section class="chat">
+                <div class="chat__logout"><button class="chat__logout-button"><span class="mdi mdi-exit-to-app"></span> Sair do chat</button></div>
+                <div class="chat__header">
+                    <div class="chat__header-user">
+                        <img src="public/images/default-avatar.png" alt="Avatar do Usuário" class="chat__header-user-avatar">
+                        <strong class="chat__header-user-name"></strong>
+                    </div>
+                    <div class="chat__header-users-online"></div>
+                </div>
+                <div class="chat__messages">
+                    <div class="chat__messages-empty">
+                        <p>Nenhuma mensagem recebida</p>
+                    </div>
+                </div>
+                <div class="chat__textarea">
+                    <input class="chat__textarea-input" type="text" placeholder="Escreva sua mensagem...">
+                    <button class="btn btn__send-circle"><span class="mdi mdi-send"></span></button>
+                </div>
+            </section>
+        </main>
+        <script>
+            let chatMessages = document.querySelector('.chat__messages');
+            let chat = document.querySelector('.chat');
+            let login = document.querySelector('.login');
+            let btnLogin = document.querySelector('.btn__login');
+            let btnSend = document.querySelector('.btn__send-circle');
+            let btnLogout = document.querySelector('.chat__logout-button');
+            let textareaInput = document.querySelector('.chat__textarea-input');
+
+            const socket = new WebSocket('ws://localhost:9990/chat');
+
+            socket.addEventListener('message', function (e) {
+                let message = JSON.parse(e.data);
+                switch(message.type) {
+                    case 'message':
+                        insertChatMesssageReceived(message);
+                        break;
+                    case 'users_connected':
+                        updateUsersConnected(message.users_connected);
+                        break;
+                }
+            });
+
+            btnLogin.addEventListener('click', handlerLogin);
+            btnSend.addEventListener('click', sendMessage);
+            btnLogout.addEventListener('click', doLogout)
+            textareaInput.addEventListener('keyup', function(e) {
+                if (event.keyCode === 13) {
+                    sendMessage();
+                }
+            });
+
+            function sendMessage() {
+                if (textareaInput.value.length > 0) {
+                    let date = new Date();
+                    const data = {
+                        message: textareaInput.value,
+                        name: getUser(),
+                        date: date.getHours() + ':' + date.getMinutes() + ' | '+date.toLocaleDateString('pt-BR', {weekday: 'long'})
+                    };
+                    socket.send(JSON.stringify(data));
+                    insertChatMesssageSended(data);
+                    textareaInput.value = '';
+                }
+            }
+
+            function handlerLogin() {
+                let name = document.querySelector('[name="name"]');
+                sessionStorage.setItem('name',name.value);
+                doLogin();
+            }
+
+            function verifyUser() {
+                if (typeof getUser() != "undefined" && getUser() !== null) {
+                    doLogin();
+                }
+            }
+
+            function doLogin() {
+                let username = document.querySelector('.chat__header-user-name');
+                login.style.display = 'none';
+                chat.style.display = 'block';
+                username.innerHTML = getUser();
+            }
+
+            function doLogout() {
+                sessionStorage.removeItem('name');
+                login.style.display = 'block';
+                chat.style.display = 'none';
+            }
+
+            function getUser() {
+                return sessionStorage.getItem('name');
+            }
+
+            function insertChatMesssageReceived(message) {
+                document.querySelector('.chat__messages-empty').style.display = 'none';
+                chatMessages.insertAdjacentHTML('beforeend',`
+                    <div class="chat__messages-received">
+                        <div class="chat__messages-received-content">
+                            <strong class="chat__messages-received-content-author">${message.name}</strong>
+                            <div class="chat__messages-received-content-message">${message.message}</div>
+                            <div class="chat__messages-received-content-date">${message.date}</div>
+                        </div>
+                    </div>`);
+            }
+
+            function insertChatMesssageSended(message) {
+                document.querySelector('.chat__messages-empty').style.display = 'none';
+                chatMessages.insertAdjacentHTML('beforeend',`
+                    <div class="chat__messages-sended">
+                        <div class="chat__messages-sended-content">
+                            <div class="chat__messages-sended-content-message">${message.message}</div>
+                            <div class="chat__messages-sended-content-date">${message.date}</div>
+                        </div>
+                    </div>`);
+            }
+
+            function updateUsersConnected(usersConnected) {
+                let usersConnectedCount = document.querySelector('.chat__header-users-online');
+                usersConnectedCount.innerHTML = `${usersConnected} usuários(s) online`;
+            }
+            verifyUser();
+        </script>
+    </body>
+</html>
